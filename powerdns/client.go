@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"net/url"
 	"os"
@@ -35,7 +34,7 @@ type Client struct {
 	APIVersion    int    // API version to use
 	HTTP          *http.Client
 	CacheEnable   bool // Enable/Disable chache for REST API requests
-	Cache         *ttlcache.Cache[string, []byte]
+	Cache         *ttlcache.Cache[string, []Record]
 }
 
 // NewClient returns a new PowerDNS client
@@ -50,8 +49,8 @@ func NewClient(serverURL string, apiKey string, configTLS *tls.Config, cacheEnab
 		return nil, fmt.Errorf("Error while creating client: %s", err)
 	}
 
-	cache := ttlcache.New[string, []byte](
-		ttlcache.WithTTL[string, []byte](time.Duration(cacheTTL) * time.Second),
+	cache := ttlcache.New[string, []Record](
+		ttlcache.WithTTL[string, []Record](time.Duration(cacheTTL) * time.Second),
 	)
 	go cache.Start()
 	client := Client{
@@ -432,74 +431,44 @@ func (client *Client) DeleteZone(name string) error {
 	return nil
 }
 
-// GetZoneInfoFromCache return ZoneInfo struct
-func (client *Client) GetZoneInfoFromCache(zone string) (*ZoneInfo, error) {
-	if client.CacheEnable {
-		cacheZoneInfo := client.Cache.Get(zone)
-		if cacheZoneInfo == nil {
-			return nil, nil
-		}
-
-		zoneInfo := new(ZoneInfo)
-		err := json.Unmarshal(cacheZoneInfo.Value(), &zoneInfo)
-		if err != nil {
-			return nil, err
-		}
-
-		return zoneInfo, err
-	}
-	return nil, nil
-}
-
 // ListRecords returns all records in Zone
 func (client *Client) ListRecords(zone string) ([]Record, error) {
 again:
-	zoneInfo, err := client.GetZoneInfoFromCache(zone)
-	if err != nil {
-		log.Printf("[WARN] module.freecache: %s: %s", zone, err)
+	r := client.Cache.Get(zone)
+	if r != nil {
+		return r.Value(), nil
 	}
 
-	if zoneInfo == nil {
-		fileLock := flock.New(path.Join(os.TempDir(), "terraform-provider-powerdns-"+zone))
-		locked, err := fileLock.TryLock()
-		if err != nil {
-			return nil, err
-		}
-		if !locked {
-			time.Sleep(10 * time.Second)
-			goto again
-		}
-		defer fileLock.Unlock()
+	fileLock := flock.New(path.Join(os.TempDir(), "terraform-provider-powerdns-"+zone))
+	locked, err := fileLock.TryLock()
+	if err != nil {
+		return nil, err
+	}
+	if !locked {
+		time.Sleep(10 * time.Second)
+		goto again
+	}
+	defer fileLock.Unlock()
 
-		req, err := client.newRequest("GET", fmt.Sprintf("/servers/localhost/zones/%s", zone), nil)
-		if err != nil {
-			return nil, err
-		}
+	req, err := client.newRequest("GET", fmt.Sprintf("/servers/localhost/zones/%s", zone), nil)
+	if err != nil {
+		return nil, err
+	}
 
-		resp, err := client.HTTP.Do(req)
-		if err != nil {
-			return nil, err
-		}
-		defer resp.Body.Close()
+	resp, err := client.HTTP.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
 
-		if resp.StatusCode >= http.StatusInternalServerError {
-			return nil, fmt.Errorf("Error getting records for zone: %s", zone)
-		}
+	if resp.StatusCode >= http.StatusInternalServerError {
+		return nil, fmt.Errorf("Error getting records for zone: %s", zone)
+	}
 
-		zoneInfo = new(ZoneInfo)
-		err = json.NewDecoder(resp.Body).Decode(zoneInfo)
-		if err != nil {
-			return nil, err
-		}
-
-		if client.CacheEnable {
-			cacheValue, err := json.Marshal(zoneInfo)
-			if err != nil {
-				return nil, err
-			}
-
-			client.Cache.Set(zone, cacheValue, ttlcache.DefaultTTL)
-		}
+	zoneInfo := new(ZoneInfo)
+	err = json.NewDecoder(resp.Body).Decode(zoneInfo)
+	if err != nil {
+		return nil, err
 	}
 
 	records := zoneInfo.Records
@@ -513,6 +482,11 @@ again:
 				TTL:     rrs.TTL,
 			})
 		}
+	}
+
+	if client.CacheEnable {
+
+		client.Cache.Set(zone, records, ttlcache.DefaultTTL)
 	}
 
 	return records, nil
