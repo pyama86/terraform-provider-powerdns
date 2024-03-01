@@ -453,19 +453,24 @@ func (client *Client) GetZoneInfoFromCache(zone string) (*ZoneInfo, error) {
 
 // ListRecords returns all records in Zone
 func (client *Client) ListRecords(zone string) ([]Record, error) {
-	fileLock := flock.New(path.Join(os.TempDir(), "terraform-provider-powerdns-"+zone))
-	err := fileLock.Lock()
-	if err != nil {
-		return nil, err
-	}
-	defer fileLock.Unlock()
-
+again:
 	zoneInfo, err := client.GetZoneInfoFromCache(zone)
 	if err != nil {
 		log.Printf("[WARN] module.freecache: %s: %s", zone, err)
 	}
 
 	if zoneInfo == nil {
+		fileLock := flock.New(path.Join(os.TempDir(), "terraform-provider-powerdns-"+zone))
+		locked, err := fileLock.TryLock()
+		if err != nil {
+			return nil, err
+		}
+		if !locked {
+			time.Sleep(10 * time.Second)
+			goto again
+		}
+		defer fileLock.Unlock()
+
 		req, err := client.newRequest("GET", fmt.Sprintf("/servers/localhost/zones/%s", zone), nil)
 		if err != nil {
 			return nil, err
