@@ -10,15 +10,15 @@ concurrency:
 jobs:
   terraform-provider-release:
     steps:
-    - name: Prepare GPG
-      run: |
-        echo "allow-loopback-pinentry" >> ~/.gnupg/gpg-agent.conf
-        gpgconf --reload gpg-agent
+      - name: Prepare GPG
+        run: |
+          echo "allow-loopback-pinentry" >> ~/.gnupg/gpg-agent.conf
+          gpgconf --reload gpg-agent
 
-    - name: 'Terraform Provider Release'
-      uses: hashicorp/ghaction-terraform-provider-release/.github/workflows/community.yml@v3
-      secrets:
-        gpg-private-key: '${{ secrets.GPG_PRIVATE_KEY }}'
-        gpg-private-key-passphrase: '${{ secrets.GPG_PRIVATE_KEY }}'
-      with:
-        setup-go-version-file: 'go.mod'
+      - name: 'Terraform Provider Release'
+        uses: hashicorp/ghaction-terraform-provider-release/.github/workflows/community.yml@v3
+        with:
+          setup-go-version-file: 'go.mod'
+        secrets:
+          gpg-private-key: '${{ secrets.GPG_PRIVATE_KEY }}'
+          gpg-private-key-passphrase: '${{ secrets.GPG_PRIVATE_KEY }}'
