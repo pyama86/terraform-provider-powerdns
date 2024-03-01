@@ -283,32 +283,6 @@ func (client *Client) detectAPIVersion() (int, error) {
 	return 0, nil
 }
 
-// ListZones returns all Zones of server, without records
-func (client *Client) ListZones() ([]ZoneInfo, error) {
-	req, err := client.newRequest("GET", "/servers/localhost/zones", nil)
-	if err != nil {
-		return nil, err
-	}
-
-	resp, err := client.HTTP.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode >= http.StatusInternalServerError {
-		return nil, fmt.Errorf("Error getting zones")
-	}
-	var zoneInfos []ZoneInfo
-
-	err = json.NewDecoder(resp.Body).Decode(&zoneInfos)
-	if err != nil {
-		return nil, err
-	}
-
-	return zoneInfos, nil
-}
-
 // GetZone gets a zone
 func (client *Client) GetZone(name string) (ZoneInfo, error) {
 	req, err := client.newRequest("GET", fmt.Sprintf("/servers/localhost/zones/%s", name), nil)
