@@ -1,0 +1,16 @@
+---
+name: release
+on:
+  push:
+    tags:
+concurrency:
+  group: release
+  cancel-in-progress: false
+jobs:
+  terraform-provider-release:
+    name: 'Terraform Provider Release'
+    uses: hashicorp/ghaction-terraform-provider-release/.github/workflows/community.yml@v3
+    secrets:
+      gpg-private-key: '${{ secrets.GPG_PRIVATE_KEY }}'
+    with:
+      setup-go-version-file: 'go.mod'
