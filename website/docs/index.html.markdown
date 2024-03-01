@@ -41,5 +41,4 @@ The following arguments are supported:
 * `ca_certificate` - (Optional) A valid path of a Root CA Certificate in PEM format _or_ the content of a Root CA certificate in PEM format. This can also be specified with `PDNS_CACERT` environment variable.
 * `insecure_https` - (Optional) Set this to `true` to disable verification of the PowerDNS server's TLS certificate. This can also be specified with the `PDNS_INSECURE_HTTPS` environment variable.
 * `cache_requests` - (Optional) Set this to `true` to enable cache of the PowerDNS REST API requests. This can also be specified with the `PDNS_CACHE_REQUESTS` environment variable. `WARNING! Enabling this option can lead to the use of stale records when you use other automation to populate the DNS zone records at the same time.`
-* `cache_mem_size` - (Optional) Memory size in MB for a cache of the PowerDNS REST API requests. This can also be specified with the `PDNS_CACHE_MEM_SIZE` environment variable.
 * `cache_ttl` - (Optional) TTL in seconds for a cache of the PowerDNS REST API requests. This can also be specified with the `PDNS_CACHE_TTL` environment variable.
